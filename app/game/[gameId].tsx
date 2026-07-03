@@ -35,7 +35,7 @@ export default function GameScreen() {
 
   const handleBack = async () => {
     await triggerHaptic('light');
-    router.back();
+    router.replace('/town');
   };
 
   return (

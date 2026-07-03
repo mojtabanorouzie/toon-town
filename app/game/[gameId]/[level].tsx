@@ -24,12 +24,12 @@ export default function PlayScreen() {
 
   const handleComplete = (score: number, stars: number) => {
     setGameCompleted(game.id, levelNumber, stars, score);
-    router.back();
+    router.replace(`/game/${game.id}`);
   };
 
   const handleBack = async () => {
     await triggerHaptic('light');
-    router.back();
+    router.replace(`/game/${game.id}`);
   };
 
   return (
