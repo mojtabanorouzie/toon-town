@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -154,19 +154,21 @@ export function AnimalSoundsGame({ level, onComplete, onBack }: GameScreenProps)
 
       <View style={styles.choicesContainer}>
         {choices.map((animal) => (
-          <Animated.View key={animal.id} style={[styles.cardWrapper, getCardStyle(animal)]}>
-            <Animated.View
-              style={styles.card}
-              onTouchEnd={() => handleChoice(animal)}
-            >
+          <TouchableOpacity
+            key={animal.id}
+            style={[styles.cardWrapper, getCardStyle(animal)]}
+            onPress={() => handleChoice(animal)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.card}>
               <Text style={styles.animalEmoji}>
                 {revealedAnimals.has(animal.id) ? animal.emoji : '❓'}
               </Text>
               {revealedAnimals.has(animal.id) && (
                 <Text style={styles.animalName}>{animal.name}</Text>
               )}
-            </Animated.View>
-          </Animated.View>
+            </View>
+          </TouchableOpacity>
         ))}
       </View>
 

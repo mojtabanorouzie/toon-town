@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -125,14 +125,16 @@ export function ColorMatchGame({ level, onComplete, onBack }: GameScreenProps) {
 
       <View style={styles.choicesContainer}>
         {choices.map((color) => (
-          <Animated.View key={color.id} style={[styles.cardWrapper, getCardStyle(color)]}>
-            <Animated.View
-              style={styles.card}
-              onTouchEnd={() => handleChoice(color)}
-            >
+          <TouchableOpacity
+            key={color.id}
+            style={[styles.cardWrapper, getCardStyle(color)]}
+            onPress={() => handleChoice(color)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.card}>
               <Text style={styles.colorEmoji}>{color.emoji}</Text>
-            </Animated.View>
-          </Animated.View>
+            </View>
+          </TouchableOpacity>
         ))}
       </View>
 
