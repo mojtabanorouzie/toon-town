@@ -1,21 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  withSequence,
-  withTiming,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
-import { spacing, fontSize, fontWeight, touchTarget, borderRadius } from '../../theme/constants';
+import { spacing, fontSize, fontWeight, borderRadius } from '../../theme/constants';
 import { ProgressBar } from '../../components/ProgressBar';
 import { CelebrationOverlay } from '../../components/CelebrationOverlay';
 import { SoundManager } from '../../audio/SoundManager';
 import { triggerHaptic, triggerSuccessHaptic, triggerErrorHaptic } from '../../utils/haptics';
 import { shuffle, pickRandom } from '../../utils/shuffle';
-import { animals as animalData, getAnimalsForLevel, getRoundsForLevel, AnimalData } from './data';
+import { getAnimalsForLevel, getRoundsForLevel, AnimalData } from './data';
 import type { GameScreenProps } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -30,11 +28,18 @@ export function AnimalSoundsGame({ level, onComplete, onBack }: GameScreenProps)
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [revealedAnimals, setRevealedAnimals] = useState<Set<string>>(new Set());
+  const mountedRef = useRef(true);
 
-  const totalRounds = getRoundsForLevel(level);
-  const availableAnimals = getAnimalsForLevel(level);
+  const totalRounds = useMemo(() => getRoundsForLevel(level), [level]);
+  const availableAnimals = useMemo(() => getAnimalsForLevel(level), [level]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const setupRound = useCallback(() => {
+    if (!mountedRef.current) return;
     const target = pickRandom(availableAnimals, 1)[0];
     const distractors = availableAnimals.filter((a) => a.id !== target.id);
     const roundChoices = [target, ...pickRandom(distractors, Math.min(3, distractors.length))];
@@ -44,17 +49,18 @@ export function AnimalSoundsGame({ level, onComplete, onBack }: GameScreenProps)
     setIsCorrect(null);
     setRevealedAnimals(new Set());
 
-    // Play the animal sound
     setTimeout(() => {
-      SoundManager.playSound(`animal-${target.id}`, 1.0);
+      if (mountedRef.current) {
+        SoundManager.playSound(`animal-${target.id}`, 1.0);
+      }
     }, 500);
   }, [availableAnimals]);
 
   useEffect(() => {
     setupRound();
-  }, [setupRound]);
+  }, [level]);
 
-  const handleChoice = async (animal: AnimalData) => {
+  const handleChoice = useCallback(async (animal: AnimalData) => {
     if (selectedId) return;
 
     setSelectedId(animal.id);
@@ -66,45 +72,53 @@ export function AnimalSoundsGame({ level, onComplete, onBack }: GameScreenProps)
     if (correct) {
       await triggerSuccessHaptic();
       await SoundManager.playSound(`animal-${animal.id}`, 1.0);
-      setScore((prev) => prev + 1);
 
       setTimeout(() => {
-        if (currentRound + 1 >= totalRounds) {
-          const stars = score + 1 >= totalRounds ? 3 : score + 1 >= totalRounds * 0.6 ? 2 : 1;
-          setShowCelebration(true);
-          setTimeout(() => {
-            onComplete(score + 1, stars);
-          }, 2000);
-        } else {
-          setCurrentRound((prev) => prev + 1);
-          setupRound();
-        }
+        if (!mountedRef.current) return;
+        setScore((prev) => {
+          const newScore = prev + 1;
+          setCurrentRound((prevRound) => {
+            const nextRound = prevRound + 1;
+            if (nextRound >= totalRounds) {
+              const stars = newScore >= totalRounds ? 3 : newScore >= totalRounds * 0.6 ? 2 : 1;
+              setShowCelebration(true);
+              setTimeout(() => {
+                if (mountedRef.current) onComplete(newScore, stars);
+              }, 2000);
+            } else {
+              setTimeout(() => setupRound(), 100);
+            }
+            return nextRound;
+          });
+          return newScore;
+        });
       }, 1000);
     } else {
       await triggerErrorHaptic();
       await SoundManager.playFeedback('wrong');
       setTimeout(() => {
-        setSelectedId(null);
-        setIsCorrect(null);
-        setRevealedAnimals((prev) => {
-          const next = new Set(prev);
-          next.delete(animal.id);
-          return next;
-        });
+        if (mountedRef.current) {
+          setSelectedId(null);
+          setIsCorrect(null);
+          setRevealedAnimals((prev) => {
+            const next = new Set(prev);
+            next.delete(animal.id);
+            return next;
+          });
+        }
       }, 800);
     }
-  };
+  }, [selectedId, targetAnimal, totalRounds, onComplete, setupRound]);
 
-  const handlePlaySound = async () => {
+  const handlePlaySound = useCallback(async () => {
     if (targetAnimal) {
       await triggerHaptic('light');
       await SoundManager.playSound(`animal-${targetAnimal.id}`, 1.0);
     }
-  };
+  }, [targetAnimal]);
 
   const getCardStyle = (animal: AnimalData) => {
     const isSelected = selectedId === animal.id;
-    const isTarget = animal.id === targetAnimal?.id;
     const isRevealed = revealedAnimals.has(animal.id);
 
     return {

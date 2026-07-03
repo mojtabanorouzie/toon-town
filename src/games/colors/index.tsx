@@ -1,20 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  withSequence,
-  withTiming,
 } from 'react-native-reanimated';
 import { colors } from '../../theme/colors';
-import { spacing, fontSize, fontWeight, touchTarget, borderRadius } from '../../theme/constants';
+import { spacing, fontSize, fontWeight, borderRadius } from '../../theme/constants';
 import { ProgressBar } from '../../components/ProgressBar';
 import { CelebrationOverlay } from '../../components/CelebrationOverlay';
 import { SoundManager } from '../../audio/SoundManager';
-import { triggerHaptic, triggerSuccessHaptic, triggerErrorHaptic } from '../../utils/haptics';
+import { triggerSuccessHaptic, triggerErrorHaptic } from '../../utils/haptics';
 import { shuffle, pickRandom } from '../../utils/shuffle';
-import { colors as colorData, getColorsForLevel, getRoundsForLevel, ColorData } from './data';
+import { getColorsForLevel, getRoundsForLevel, ColorData } from './data';
 import type { GameScreenProps } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -28,11 +26,18 @@ export function ColorMatchGame({ level, onComplete, onBack }: GameScreenProps) {
   const [showCelebration, setShowCelebration] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const mountedRef = useRef(true);
 
-  const totalRounds = getRoundsForLevel(level);
-  const availableColors = getColorsForLevel(level);
+  const totalRounds = useMemo(() => getRoundsForLevel(level), [level]);
+  const availableColors = useMemo(() => getColorsForLevel(level), [level]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const setupRound = useCallback(() => {
+    if (!mountedRef.current) return;
     const target = pickRandom(availableColors, 1)[0];
     const distractors = availableColors.filter((c) => c.id !== target.id);
     const roundChoices = [target, ...pickRandom(distractors, Math.min(3, distractors.length))];
@@ -44,9 +49,9 @@ export function ColorMatchGame({ level, onComplete, onBack }: GameScreenProps) {
 
   useEffect(() => {
     setupRound();
-  }, [setupRound]);
+  }, [level]);
 
-  const handleChoice = async (color: ColorData) => {
+  const handleChoice = useCallback(async (color: ColorData) => {
     if (selectedId) return;
 
     setSelectedId(color.id);
@@ -59,31 +64,39 @@ export function ColorMatchGame({ level, onComplete, onBack }: GameScreenProps) {
       setScore((prev) => prev + 1);
 
       setTimeout(() => {
-        if (currentRound + 1 >= totalRounds) {
-          const stars = score + 1 >= totalRounds ? 3 : score + 1 >= totalRounds * 0.6 ? 2 : 1;
-          setShowCelebration(true);
-          setTimeout(() => {
-            onComplete(score + 1, stars);
-          }, 2000);
-        } else {
-          setCurrentRound((prev) => prev + 1);
-          setupRound();
-        }
+        if (!mountedRef.current) return;
+        setCurrentRound((prev) => {
+          const nextRound = prev + 1;
+          if (nextRound >= totalRounds) {
+            setScore((s) => {
+              const finalScore = s + 1;
+              const stars = finalScore >= totalRounds ? 3 : finalScore >= totalRounds * 0.6 ? 2 : 1;
+              setShowCelebration(true);
+              setTimeout(() => {
+                if (mountedRef.current) onComplete(finalScore, stars);
+              }, 2000);
+              return s;
+            });
+          } else {
+            setTimeout(() => setupRound(), 100);
+          }
+          return nextRound;
+        });
       }, 800);
     } else {
       await triggerErrorHaptic();
       await SoundManager.playFeedback('wrong');
       setTimeout(() => {
-        setSelectedId(null);
-        setIsCorrect(null);
+        if (mountedRef.current) {
+          setSelectedId(null);
+          setIsCorrect(null);
+        }
       }, 600);
     }
-  };
+  }, [selectedId, targetColor, totalRounds, onComplete, setupRound]);
 
   const getCardStyle = (color: ColorData) => {
     const isSelected = selectedId === color.id;
-    const isTarget = color.id === targetColor?.id;
-
     return {
       backgroundColor: color.hex,
       transform: [{ scale: isSelected ? (isCorrect ? 1.1 : 0.9) : 1 }],
