@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Toon Town",
+    "slug": "toon-town",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "toontown",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.toontown.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFE4B5",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.toontown.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-av"
+    ]
+  }
+}
